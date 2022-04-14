@@ -95,3 +95,33 @@ sys_uptime(void)
   release(&tickslock);
   return xticks;
 }
+
+uint64
+sys_pause_system(void)
+{
+  int time;
+
+  acquire(&tickslock);
+  if(argint(0, &time) < 0)
+    return -1;
+
+  time = time*10;
+  pause_system(time);
+  pause_helper(&tickslock);
+  release(&tickslock);
+
+  return 0;
+}
+
+uint64
+sys_kill_system(void)
+{
+  return kill_system();
+}
+
+uint64
+sys_print_stat(void)
+{
+  print_stat();
+  return 0;
+}

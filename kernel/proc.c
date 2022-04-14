@@ -6,6 +6,11 @@
 #include "proc.h"
 #include "defs.h"
 
+int rate = 5;
+
+int pause_time = 0;
+int entrence_tick = 0;
+
 struct cpu cpus[NCPU];
 
 struct proc proc[NPROC];
@@ -434,8 +439,25 @@ wait(uint64 addr)
 //  - swtch to start running that process.
 //  - eventually that process transfers control
 //    via swtch back to the scheduler.
+
+
+
 void
 scheduler(void)
+{
+  #ifdef DEFAULT
+    default_scheduler();
+  #endif
+  #ifdef SJF
+    SJF_scheduler();
+  #endif
+  // #ifdef FCFS
+  //   fcfs_scheduler();
+  // #endif
+}
+
+void
+default_scheduler(void)
 {
   struct proc *p;
   struct cpu *c = mycpu();
@@ -446,23 +468,135 @@ scheduler(void)
     intr_on();
 
     for(p = proc; p < &proc[NPROC]; p++) {
-      acquire(&p->lock);
-      if(p->state == RUNNABLE) {
+      if(p->pid <3 || ticks-entrence_tick >= pause_time) {
+        acquire(&p->lock);
+        if(p->state == RUNNABLE) {
+          // Switch to chosen process.  It is the process's job
+          // to release its lock and then reacquire it
+          // before jumping back to us.
+          p->state = RUNNING;
+          c->proc = p;
+          swtch(&c->context, &p->context);
+
+          // Process is done running for now.
+          // It should have changed its p->state before coming back.
+          c->proc = 0;
+        }
+        release(&p->lock);
+      }
+    }
+  }
+}
+
+void
+SJF_scheduler(void)
+{
+  struct proc *p;
+  struct cpu *c = mycpu();
+  int min_mean = -1;
+
+  c->proc = 0;
+  for(;;){
+    // Avoid deadlock by ensuring that devices can interrupt.
+    intr_on();
+
+    struct proc *min_proc = 0;
+    int ticks_start;
+
+    for(p = proc; p < &proc[NPROC]; p++) {
+        acquire(&p->lock);
+        if(p->state == RUNNABLE && (p->mean_ticks < min_mean || min_mean == -1)){
+          min_mean = p->mean_ticks;
+          min_proc = p;
+        }
+        release(&p->lock);
+    }  
+    if(min_proc->pid <3 || ticks-entrence_tick >= pause_time) {
+      acquire(&min_proc->lock);
+      if(min_proc->state == RUNNABLE) {
         // Switch to chosen process.  It is the process's job
         // to release its lock and then reacquire it
         // before jumping back to us.
-        p->state = RUNNING;
-        c->proc = p;
-        swtch(&c->context, &p->context);
+        min_proc->state = RUNNING;
+        c->proc = min_proc;
+
+        ticks_start = ticks;
+        swtch(&c->context, &min_proc->context);
+        min_proc->last_ticks = ticks - ticks_start;
+        min_proc->mean_ticks = ((10 - rate) * min_proc->mean_ticks + min_proc->last_ticks * (rate)) / 10;
 
         // Process is done running for now.
         // It should have changed its p->state before coming back.
         c->proc = 0;
       }
-      release(&p->lock);
+      release(&min_proc->lock);
     }
+    
   }
 }
+
+void
+FCFS_scheduler(void)
+{
+  
+}
+
+
+
+int
+pause_system(int time)
+{
+  pause_time = time;
+  entrence_tick = ticks;
+  // yield(); //check if needed
+  return 0;
+}
+
+int
+pause_helper(struct spinlock *lk){
+    struct proc *p = myproc();
+  
+  // Must acquire p->lock in order to
+  // change p->state and then call sched.
+  // Once we hold p->lock, we can be
+  // guaranteed that we won't miss any wakeup
+  // (wakeup locks p->lock),
+  // so it's okay to release lk.
+
+  acquire(&p->lock);  //DOC: sleeplock1
+  release(lk);
+
+  p->state = RUNNABLE;
+
+  sched();
+
+
+  // Reacquire original lock.
+  release(&p->lock);
+  acquire(lk);
+  return 0;
+}
+
+int
+kill_system(void) {
+    struct proc *p;
+
+  for(p = proc; p < &proc[NPROC]; p++){
+    acquire(&p->lock);
+    if(p->pid > 2){
+      p->killed = 1;
+      if(p->state == SLEEPING){
+        // Wake process from sleep().
+        p->state = RUNNABLE;
+      }
+      release(&p->lock);
+      return 0;
+    }
+    release(&p->lock);
+  }
+  return -1;
+}
+
 
 // Switch to scheduler.  Must hold only p->lock
 // and have changed proc->state. Saves and restores
@@ -653,4 +787,9 @@ procdump(void)
     printf("%d %s %s", p->pid, state, p->name);
     printf("\n");
   }
+}
+
+int print_stat(void){
+  
+  return 0;
 }
