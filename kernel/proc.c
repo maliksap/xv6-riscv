@@ -495,6 +495,8 @@ default_scheduler(void)
           // to release its lock and then reacquire it
           // before jumping back to us.
           p->state = RUNNING;
+          p->last_running_start = ticks;
+          p->runnable_time += ticks-p->last_runnable_start;
           c->proc = p;
           swtch(&c->context, &p->context);
 
@@ -543,6 +545,8 @@ SJF_scheduler(void)
         // to release its lock and then reacquire it
         // before jumping back to us.
         min_proc->state = RUNNING;
+        p->last_running_start = ticks;
+        p->runnable_time += ticks-p->last_runnable_start;
         c->proc = min_proc;
 
         ticks_start = ticks;
@@ -593,6 +597,9 @@ FCFS_scheduler(void)
       acquire(&min_proc->lock);
       if(min_proc->state == RUNNABLE) {
         min_proc->state = RUNNING;
+        p->last_running_start = ticks;
+        p->runnable_time += ticks-p->last_runnable_start;
+
         c->proc = min_proc;
 
         ticks_start = ticks;
@@ -657,6 +664,8 @@ kill_system(void) {
       if(p->state == SLEEPING){
         // Wake process from sleep().
         p->state = RUNNABLE;
+        p->sleeping_time += ticks-p->last_sleeping_start;
+        p->last_runnable_start = ticks;
       }
       release(&p->lock);
       return 0;
@@ -701,6 +710,8 @@ yield(void)
   struct proc *p = myproc();
   acquire(&p->lock);
   p->state = RUNNABLE;
+  p->running_time += ticks - p->last_running_start;
+  p->last_runnable_start = ticks;
   sched();
   release(&p->lock);
 }
@@ -746,6 +757,7 @@ sleep(void *chan, struct spinlock *lk)
   // Go to sleep.
   p->chan = chan;
   p->state = SLEEPING;
+  p->last_sleeping_start = ticks;
 
   sched();
 
@@ -769,6 +781,8 @@ wakeup(void *chan)
       acquire(&p->lock);
       if(p->state == SLEEPING && p->chan == chan) {
         p->state = RUNNABLE;
+        p->sleeping_time += ticks-p->last_sleeping_start;
+        p->last_runnable_start = ticks;
       }
       release(&p->lock);
     }
@@ -790,6 +804,8 @@ kill(int pid)
       if(p->state == SLEEPING){
         // Wake process from sleep().
         p->state = RUNNABLE;
+        p->sleeping_time += ticks-p->last_sleeping_start;
+        p->last_runnable_start = ticks;
       }
       release(&p->lock);
       return 0;
@@ -839,7 +855,7 @@ procdump(void)
   [UNUSED]    "unused",
   [SLEEPING]  "sleep ",
   [RUNNABLE]  "runble",
-  [RUNNING]   "run   ",
+  [RUNNING]   "run   ",sl
   [ZOMBIE]    "zombie"
   };
   struct proc *p;
