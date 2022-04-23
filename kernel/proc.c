@@ -180,6 +180,18 @@ freeproc(struct proc *p)
   p->killed = 0;
   p->xstate = 0;
   p->state = UNUSED;
+  p->sleeping_time = 0;
+  p->running_time = 0;
+  p->runnable_time = 0;
+  p->last_sleeping_start = 0;
+  p->last_running_start = 0;
+  p->last_runnable_start = 0;
+  p->mean_ticks = 0;
+  p->last_ticks = 0;
+
+  p->last_runnable_time = 0;
+
+
 }
 
 // Create a user page table for a given process,
@@ -517,54 +529,74 @@ SJF_scheduler(void)
 {
   struct proc *p;
   struct cpu *c = mycpu();
+  struct proc *min_proc = 0;
+  // printf("min_proc is %d and mean_ticks is %d\n", p->pid, p->mean_ticks);
+
 
   c->proc = 0;
   for(;;){
     // Avoid deadlock by ensuring that devices can interrupt.
     intr_on();
 
-    struct proc *min_proc = &proc[0];
-    int ticks_start;
+    int ticks_start = 0;
+    min_proc = 0;
 
     for(p = proc; p < &proc[NPROC]; p++) {
-        acquire(&p->lock);
-                
-        if(p->state == RUNNABLE && (p->mean_ticks <= min_proc->mean_ticks)){
-          printf("hi %d\n", p->pid);
+      if(p->state != RUNNABLE){
+        continue;
+      }
+        if(min_proc == 0) {
           min_proc = p;
+          continue;
+        }
+        acquire(&p->lock);
+        
+        if((p->mean_ticks < min_proc->mean_ticks)){
+          
+          min_proc = p;
+        }
+        else{
+          release(&p->lock);
+          continue;
         }
         release(&p->lock);
     } 
+    // acquire(&min_proc->lock);
+    // printf("min_proc is %d and mean_ticks is %d\n", min_proc->pid, min_proc->mean_ticks);
+    // release(&min_proc->lock);
 
     // add by BEN meanimg no process is in runnable mode
     if (min_proc == 0)
       continue;
 
-    if(min_proc->pid <3 || ticks-entrence_tick >= pause_time) {
+    // if(min_proc->pid <3 || ticks-entrence_tick >= pause_time) {
       acquire(&min_proc->lock);
-      if(min_proc->state == RUNNABLE) {
+      // if(min_proc->state == RUNNABLE) {
         // Switch to chosen process.  It is the process's job
         // to release its lock and then reacquire it
         // before jumping back to us.
         min_proc->state = RUNNING;
-        p->last_running_start = ticks;
-        p->runnable_time += ticks-p->last_runnable_time;
+        min_proc->last_running_start = ticks;
+        min_proc->runnable_time += ticks-min_proc->last_runnable_time;
         c->proc = min_proc;
-        if(c->proc->pid>1){
-          printf("selected pid: %d &mean_ticks is: %d\n", c->proc->pid, c->proc->mean_ticks);
-        }
+        
+        // printf("selected pid: %d &mean_ticks is: %d\n", c->proc->pid, c->proc->mean_ticks);
 
         ticks_start = ticks;
         swtch(&c->context, &min_proc->context);
+        c->proc = 0;
         min_proc->last_ticks = ticks - ticks_start;
+        procdump();
+        // printf("ticks start:%d\n", ticks_start);
+        // printf("last tick:%d\n", min_proc->last_ticks);
+        // printf("ticks:%d\n", ticks);
         min_proc->mean_ticks = ((10 - rate) * min_proc->mean_ticks + min_proc->last_ticks * (rate)) / 10;
 
         // Process is done running for now.
         // It should have changed its p->state before coming back.
-        c->proc = 0;
-      }
+      // }
       release(&min_proc->lock);
-    }
+    // }
     
   }
 }
@@ -601,15 +633,15 @@ FCFS_scheduler(void)
       if(min_proc->state == RUNNABLE) {
         min_proc->state = RUNNING;
         if(min_proc->pid>2){
-          p->last_running_start = ticks;
+          min_proc->last_running_start = ticks;
         }
-        p->runnable_time += ticks-p->last_runnable_time;
+        min_proc->runnable_time += ticks-min_proc->last_runnable_time;
 
         c->proc = min_proc;
 
         min_proc->last_runnable_time = ticks;
 
-        printf("selected pid: %d &last_runnable_time is: %d\n", c->proc->pid, c->proc->last_runnable_time);
+        // printf("selected pid: %d &last_runnable_time is: %d\n", c->proc->pid, c->proc->last_runnable_time);
         swtch(&c->context, &min_proc->context);
         
 
