@@ -12,22 +12,22 @@
 
 void env(int size, int interval, char* env_name) {
     int result = 1;
-    int loop_size = 100;
-    int n_forks = 3;
+    int loop_size = 1000;
+    int n_forks = 2;
     int pid;
     for (int i = 0; i < n_forks; i++) {
         pid = fork();
     }
 
     for (int i = 0; i < loop_size; i++) {
-        int loopSizeDevided = loop_size / 10e0;
-        if (i % loopSizeDevided == 0) {
+        //  int loopSizeDevided = loop_size / 10e0;
+        // if (i % loopSizeDevided == 0) {
         	if (pid == 0) {
         		printf("%s %d/%d completed.\n", env_name, i, loop_size);
         	} else {
         		printf(" ");
         	}
-        }
+        //  }
         if (i % interval == 0) {
             result = result * size;
         }

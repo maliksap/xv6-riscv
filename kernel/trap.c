@@ -78,10 +78,10 @@ usertrap(void)
 
   // give up the CPU if this is a timer interrupt.
   if(which_dev == 2){
-    #ifdef DEFAULT
-      yield();
-    #endif
-    // yield();
+    // #ifdef DEFAULT
+    //   yield();
+    // #endif
+    yield();
   }
   usertrapret();
 }
@@ -154,10 +154,10 @@ kerneltrap()
 
   // give up the CPU if this is a timer interrupt.
   if(which_dev == 2 && myproc() != 0 && myproc()->state == RUNNING){
-    #ifdef DEFAULT
-      yield();
-    #endif
-    // yield();
+    // #ifdef DEFAULT
+    //   yield();
+    // #endif
+    yield();
   }
 
   // the yield() may have caused some traps to occur,

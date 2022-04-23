@@ -370,6 +370,8 @@ exit(int status)
   struct proc *p = myproc();
   // statistics
   num_process++;
+  // printf("p->running_time %d \n", p->running_time);
+  // printf("program_time %d \n", program_time);
   sleeping_processes_mean = ((sleeping_processes_mean * (num_process - 1)) + p->sleeping_time) / num_process;
   running_processes_mean = ((running_processes_mean * (num_process - 1)) + p->running_time) / num_process;
   runnable_processes_mean = ((runnable_processes_mean * (num_process - 1) + p->runnable_time)) / num_process;
@@ -512,8 +514,6 @@ default_scheduler(void)
           c->proc = p;
           swtch(&c->context, &p->context);
 
-          // printf("mean_ticks::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::: /n");
-
           // Process is done running for now.
           // It should have changed its p->state before coming back.
           c->proc = 0;
@@ -542,24 +542,21 @@ SJF_scheduler(void)
     min_proc = 0;
 
     for(p = proc; p < &proc[NPROC]; p++) {
+      acquire(&p->lock);
       if(p->state != RUNNABLE){
+        release(&p->lock);
         continue;
       }
-        if(min_proc == 0) {
-          min_proc = p;
-          continue;
-        }
-        acquire(&p->lock);
-        
-        if((p->mean_ticks < min_proc->mean_ticks)){
-          
-          min_proc = p;
-        }
-        else{
-          release(&p->lock);
-          continue;
-        }
+      if(min_proc == 0) {
+        min_proc = p;
         release(&p->lock);
+        continue;
+      }
+      if(p->mean_ticks < min_proc->mean_ticks){
+        min_proc = p;
+      }
+  
+      release(&p->lock);
     } 
     // acquire(&min_proc->lock);
     // printf("min_proc is %d and mean_ticks is %d\n", min_proc->pid, min_proc->mean_ticks);
@@ -571,30 +568,33 @@ SJF_scheduler(void)
 
     // if(min_proc->pid <3 || ticks-entrence_tick >= pause_time) {
       acquire(&min_proc->lock);
-      // if(min_proc->state == RUNNABLE) {
-        // Switch to chosen process.  It is the process's job
-        // to release its lock and then reacquire it
-        // before jumping back to us.
+      while(min_proc->state == RUNNABLE) {
         min_proc->state = RUNNING;
         min_proc->last_running_start = ticks;
         min_proc->runnable_time += ticks-min_proc->last_runnable_time;
         c->proc = min_proc;
         
-        // printf("selected pid: %d &mean_ticks is: %d\n", c->proc->pid, c->proc->mean_ticks);
-
         ticks_start = ticks;
+        // printf("\n pid is:%d and mean_ticks is:%d\n", min_proc->pid, min_proc->mean_ticks);
+
         swtch(&c->context, &min_proc->context);
+        // min_proc->running_time += ticks - min_proc->last_running_start;
+        // min_proc->last_runnable_time = ticks;
+        // printf("runnnnnnnnnnnnning time:%d\n", min_proc->running_time);
+
+
         c->proc = 0;
         min_proc->last_ticks = ticks - ticks_start;
-        procdump();
+        // procdump();
+        // printf("\n\n min_proc is:%d\n", min_proc->pid);
         // printf("ticks start:%d\n", ticks_start);
         // printf("last tick:%d\n", min_proc->last_ticks);
         // printf("ticks:%d\n", ticks);
         min_proc->mean_ticks = ((10 - rate) * min_proc->mean_ticks + min_proc->last_ticks * (rate)) / 10;
+        // printf("min_proc-new mean_ticks:%d\n", min_proc->mean_ticks);
 
-        // Process is done running for now.
-        // It should have changed its p->state before coming back.
-      // }
+
+      }
       release(&min_proc->lock);
     // }
     
@@ -617,20 +617,25 @@ FCFS_scheduler(void)
 
 
     for(p = proc; p < &proc[NPROC]; p++) {
-        acquire(&p->lock);
-        if(p->state == RUNNABLE && (p->last_runnable_time <= min_running_time || min_running_time == -1)){
-          min_running_time = p->last_runnable_time;
-          min_proc = p;
-        }
+      acquire(&p->lock);
+      if(p->state != RUNNABLE){
         release(&p->lock);
-    }  
+        continue;
+      }
+      
+      if(p->last_runnable_time <= min_running_time || min_running_time == -1){
+        min_proc = p;
+      }
+  
+      release(&p->lock);
+     }
     // add by BEN meanimg no process is in runnable mode
     if (min_proc == 0)
       continue;
 
-    if(min_proc->pid <3 || ticks-entrence_tick >= pause_time) {
+    // if(min_proc->pid <3 || ticks-entrence_tick >= pause_time) {
       acquire(&min_proc->lock);
-      if(min_proc->state == RUNNABLE) {
+      // if(min_proc->state == RUNNABLE) {
         min_proc->state = RUNNING;
         if(min_proc->pid>2){
           min_proc->last_running_start = ticks;
@@ -648,9 +653,9 @@ FCFS_scheduler(void)
         // Process is done running for now.
         // It should have changed its p->state before coming back.
         c->proc = 0;
-      }
+      // }
       release(&min_proc->lock);
-    } 
+    // } 
   }  
 }
 
