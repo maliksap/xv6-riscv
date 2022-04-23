@@ -566,7 +566,7 @@ SJF_scheduler(void)
     if (min_proc == 0)
       continue;
 
-    // if(min_proc->pid <3 || ticks-entrence_tick >= pause_time) {
+    if(min_proc->pid <3 || ticks-entrence_tick >= pause_time) {
       acquire(&min_proc->lock);
       while(min_proc->state == RUNNABLE) {
         min_proc->state = RUNNING;
@@ -596,7 +596,7 @@ SJF_scheduler(void)
 
       }
       release(&min_proc->lock);
-    // }
+    }
     
   }
 }
@@ -633,7 +633,7 @@ FCFS_scheduler(void)
     if (min_proc == 0)
       continue;
 
-    // if(min_proc->pid <3 || ticks-entrence_tick >= pause_time) {
+    if(min_proc->pid <3 || ticks-entrence_tick >= pause_time) {
       acquire(&min_proc->lock);
       // if(min_proc->state == RUNNABLE) {
         min_proc->state = RUNNING;
@@ -655,7 +655,7 @@ FCFS_scheduler(void)
         c->proc = 0;
       // }
       release(&min_proc->lock);
-    // } 
+    } 
   }  
 }
 
