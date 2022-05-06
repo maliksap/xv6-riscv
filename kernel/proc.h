@@ -105,4 +105,19 @@ struct proc {
   struct file *ofile[NOFILE];  // Open files
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
+
+  //for SJF scheduler
+  int mean_ticks;
+  int last_ticks;
+
+  // for FCFS schedular 
+  int last_runnable_time;
+
+  // for assingment 4 
+  int sleeping_time;
+  int running_time;
+  int runnable_time;
+  int last_sleeping_start;
+  int last_running_start;
+  int last_runnable_start;
 };
